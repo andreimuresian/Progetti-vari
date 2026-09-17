@@ -88,7 +88,14 @@ jobs:
           }
           finally {
             Start-Sleep -Seconds 2
-            taskkill /F /T /PID $app.Id 2>&1 | Out-Null
+            $app.Refresh()
+            if (-not $app.HasExited) {
+              Start-Process -FilePath "taskkill" -ArgumentList "/F", "/T", "/PID", $app.Id `
+                            -Wait -NoNewWindow -ErrorAction SilentlyContinue
+            }
+            # /api/quit already stopped it in the normal case, and a taskkill that
+            # finds nothing to kill must not be mistaken for a failing smoke test
+            $global:LASTEXITCODE = 0
           }
 
       - name: Show the build log if anything failed
