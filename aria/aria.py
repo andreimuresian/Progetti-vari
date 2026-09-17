@@ -29,17 +29,21 @@ from urllib.parse import urlparse, parse_qs
 from urllib.request import Request, urlopen
 
 APP_NAME = "Aria"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 IS_WINDOWS = os.name == "nt"
 
 # Where the tools come from. Both are fetched once on first run and then kept
 # up to date in place, so the app keeps working as video sites change.
-YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+YTDLP_URLS = [
+    "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe",
+    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+]
+YTDLP_CHANNEL = "nightly"
 FFMPEG_ZIPS = [
     "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
     "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
 ]
-UPDATE_INTERVAL = 5 * 24 * 3600  # how often to let yt-dlp update itself
+UPDATE_INTERVAL = 24 * 3600  # how often to let yt-dlp update itself
 
 PORTS = range(8756, 8776)
 IDLE_SHUTDOWN = 150  # seconds without a browser heartbeat before the app exits
@@ -48,6 +52,31 @@ IDLE_SHUTDOWN = 150  # seconds without a browser heartbeat before the app exits
 LONG_VIDEO_SECONDS = 45 * 60
 
 CREATE_NO_WINDOW = 0x08000000 if IS_WINDOWS else 0
+
+# YouTube serves its player through several "clients", and it rejects different
+# ones over time - that is what "content is not available on this app" means.
+# Rather than pin one and hope, try them in turn and remember what worked.
+PLAYER_CLIENTS = [
+    None,                     # whatever this build of yt-dlp defaults to
+    "default,-tv_simply",
+    "web_safari,web",
+    "mweb",
+    "tv_embedded",
+    "android_vr",
+    "ios",
+]
+
+# Failures worth retrying with a different client, as opposed to "this video is
+# private", which no amount of retrying will fix.
+CLIENT_TROUBLE = re.compile(
+    r"not available on this app"
+    r"|failed to extract any player response"
+    r"|unable to extract (?:player|yt initial data|video data|initial player)"
+    r"|invalid player client|unsupported client|no video formats found"
+    r"|requested format is not available"
+    r"|sign in to confirm",
+    re.I,
+)
 
 
 # --------------------------------------------------------------------------
@@ -201,19 +230,85 @@ def _save_state(state):
         log.exception("could not save state")
 
 
+updating = threading.Lock()
+
+
+def update_tools():
+    """Pull the newest yt-dlp on demand and forget the remembered client."""
+    if not updating.acquire(blocking=False):
+        return
+    try:
+        setup.update(state="updating", percent=0, message="", error="")
+        result = run_hidden([tool("yt-dlp"), "--update-to", YTDLP_CHANNEL],
+                            capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", timeout=300)
+        output = ((result.stdout or "") + (result.stderr or "")).strip()
+        log.info("update (%s): %s", result.returncode, output[-400:])
+        if result.returncode != 0:
+            setup.update(state="update-failed", error=output.splitlines()[-1][:200] if output else "")
+            return
+        state = _load_state()
+        state["last_update"] = time.time()
+        state.pop("player_client", None)  # let the carousel find the best one again
+        _save_state(state)
+        setup.update(state="updated", percent=100)
+        threading.Timer(6, lambda: setup.update(state="ready")).start()
+    except Exception as err:
+        log.exception("update failed")
+        setup.update(state="update-failed", error=str(err))
+    finally:
+        updating.release()
+
+
+def client_order():
+    """Clients to try, best-known-good first."""
+    order = list(PLAYER_CLIENTS)
+    remembered = _load_state().get("player_client", "\0")
+    if remembered in order:
+        order.remove(remembered)
+        order.insert(0, remembered)
+    return order
+
+
+def remember_client(client):
+    state = _load_state()
+    if state.get("player_client", "\0") != client:
+        state["player_client"] = client
+        _save_state(state)
+        log.info("player client that works here: %r", client)
+
+
+def client_args(client):
+    return ["--extractor-args", f"youtube:player_client={client}"] if client else []
+
+
 def ensure_tools():
     """Make sure yt-dlp and ffmpeg exist, downloading them on first run."""
     state = _load_state()
-    have_ytdlp = os.path.exists(tool("yt-dlp"))
+    # an install made before Aria tracked the nightly channel is replaced once
+    have_ytdlp = os.path.exists(tool("yt-dlp")) and state.get("channel") == YTDLP_CHANNEL
     have_ffmpeg = os.path.exists(tool("ffmpeg"))
 
     try:
         if not have_ytdlp:
             setup.update(state="downloading", percent=0, message="yt-dlp")
-            _download(YTDLP_URL, os.path.join(BIN_DIR, exe("yt-dlp")),
-                      lambda f: setup.update(percent=round(f * 100)))
+            target = os.path.join(BIN_DIR, exe("yt-dlp"))
+            last_error = None
+            for url in YTDLP_URLS:
+                try:
+                    _download(url, target, lambda f: setup.update(percent=round(f * 100)))
+                    last_error = None
+                    break
+                except Exception as err:
+                    last_error = err
+                    log.warning("yt-dlp mirror failed %s: %s", url, err)
+            if last_error:
+                raise last_error
             if not IS_WINDOWS:
-                os.chmod(os.path.join(BIN_DIR, exe("yt-dlp")), 0o755)
+                os.chmod(target, 0o755)
+            state["channel"] = YTDLP_CHANNEL
+            state["last_update"] = time.time()
+            _save_state(state)
 
         if not have_ffmpeg:
             setup.update(state="downloading", percent=0, message="ffmpeg")
@@ -256,6 +351,9 @@ def ensure_tools():
 # --------------------------------------------------------------------------
 
 FRIENDLY_ERRORS = [
+    (r"not available on this app|failed to extract any player response",
+     "YouTube refused every connection method Aria knows. Press Update at the "
+     "bottom of the window, then try again."),
     (r"private video", "This video is private."),
     (r"members[- ]only|join this channel", "This video is for channel members only."),
     (r"confirm your age|age[- ]restricted|inappropriate for some users",
@@ -333,12 +431,23 @@ jobs_lock = threading.Lock()
 
 def probe(url):
     """Fetch title / duration / thumbnail without downloading anything."""
-    args = [tool("yt-dlp"), "-J", "--no-playlist", "--no-warnings", "--ignore-config",
-            "--socket-timeout", "20", url]
-    result = run_hidden(args, capture_output=True, text=True, encoding="utf-8",
-                        errors="replace", timeout=90)
+    failure = ""
+    for client in client_order():
+        args = ([tool("yt-dlp"), "-J", "--no-playlist", "--no-warnings", "--ignore-config",
+                 "--socket-timeout", "20"] + client_args(client) + [url])
+        result = run_hidden(args, capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", timeout=90)
+        if result.returncode == 0:
+            remember_client(client)
+            break
+        failure = result.stderr or ""
+        log.info("probe: player client %r did not work: %s", client, failure.strip()[-160:])
+        if not CLIENT_TROUBLE.search(failure):
+            break
+    else:
+        raise RuntimeError(friendly(failure.splitlines()))
     if result.returncode != 0:
-        raise RuntimeError(friendly((result.stderr or "").splitlines()))
+        raise RuntimeError(friendly(failure.splitlines()))
     info = json.loads(result.stdout)
     if info.get("_type") == "playlist":  # a link that is only a playlist
         entries = info.get("entries") or []
@@ -351,10 +460,11 @@ def probe(url):
     }
 
 
-def build_args(job):
+def build_args(job, client=None):
     """Turn a job into a yt-dlp command line."""
     args = [
         tool("yt-dlp"), job.url,
+        *client_args(client),
         "--ignore-config", "--no-playlist", "--newline", "--no-colors",
         "--no-simulate", "--progress",
         "--concurrent-fragments", "16",     # the single biggest speed win
@@ -401,12 +511,37 @@ def run_job(job):
             job.status, job.error = "error", str(err)
             return
 
+    tail = []
+    for client in client_order():
+        if job.cancelled:
+            break
+        job.percent, job.speed, job.eta = 0.0, 0.0, 0
+        job.status = "downloading"
+        code, tail = download_once(job, client)
+        if job.cancelled:
+            break
+        if code == 0:
+            remember_client(client)
+            job.percent = 100.0
+            job.status = "done"
+            if not job.filepath:
+                job.filepath = OUT_DIR
+            return
+        log.warning("job %s: player client %r failed with %s", job.id, client, code)
+        if not CLIENT_TROUBLE.search("\n".join(tail)):
+            break
+
     if job.cancelled:
         job.status = "canceled"
-        return
+    else:
+        job.status = "error"
+        job.error = friendly(tail)
+        log.error("job %s failed: %s", job.id, "\n".join(tail[-12:]))
 
-    job.status = "downloading"
-    args = build_args(job)
+
+def download_once(job, client):
+    """Run yt-dlp once with one player client; returns (exit code, last output)."""
+    args = build_args(job, client)
     log.info("job %s: %s", job.id, " ".join(args[1:]))
 
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
@@ -448,18 +583,7 @@ def run_job(job):
 
     code = job.process.wait()
     job.process = None
-
-    if job.cancelled:
-        job.status = "canceled"
-    elif code == 0:
-        job.percent = 100.0
-        job.status = "done"
-        if not job.filepath:
-            job.filepath = OUT_DIR
-    else:
-        job.status = "error"
-        job.error = friendly(tail)
-        log.error("job %s failed (%s): %s", job.id, code, "\n".join(tail[-12:]))
+    return code, tail
 
 
 def _number(text):
@@ -674,6 +798,10 @@ class Handler(BaseHTTPRequestHandler):
             job = jobs.get(body.get("id"))
             if job:
                 _play(job.filepath)
+            return self._send(200, {"ok": True})
+
+        if path == "/api/update":
+            threading.Thread(target=update_tools, daemon=True).start()
             return self._send(200, {"ok": True})
 
         if path == "/api/quit":

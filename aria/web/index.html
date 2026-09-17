@@ -201,6 +201,7 @@
     <span data-i="savedTo">Saved to</span> <code id="outdir">…</code>
     <button id="openfolder" data-i="openFolder">Open folder</button>
     <span class="spacer"></span>
+    <button id="update" data-i="update">Update</button>
     <span>Aria __ARIA_VERSION__</span>
     <button id="quit" data-i="quit">Quit</button>
   </footer>
@@ -218,6 +219,8 @@ const STR = {
     download:"Download", savedTo:"Saved to", openFolder:"Open folder", quit:"Quit",
     setupTitle:"Getting ready", setupOnce:"One-time setup, about a minute. Downloading %s…",
     setupExtract:"Unpacking %s…", setupFail:"Setup failed: %s",
+    update:"Update", updating:"Fetching the newest version…",
+    updated:"Up to date. Try your link again.", updateFailed:"Update failed: %s",
     hintAutoMp3:"Automatic picks the best audio quality for this length.",
     hintAutoMp4:"Automatic picks %s for this video.",
     hintAutoIdle:"Automatic adapts to the length of the video.",
@@ -238,6 +241,8 @@ const STR = {
     download:"Scarica", savedTo:"Salvato in", openFolder:"Apri cartella", quit:"Esci",
     setupTitle:"Preparazione", setupOnce:"Configurazione iniziale, circa un minuto. Scarico %s…",
     setupExtract:"Estrazione di %s…", setupFail:"Preparazione fallita: %s",
+    update:"Aggiorna", updating:"Scarico la versione più recente…",
+    updated:"Tutto aggiornato. Riprova con il link.", updateFailed:"Aggiornamento fallito: %s",
     hintAutoMp3:"L'automatica sceglie la qualità migliore per questa durata.",
     hintAutoMp4:"L'automatica sceglie %s per questo video.",
     hintAutoIdle:"L'automatica si adatta alla durata del video.",
@@ -377,6 +382,7 @@ async function start(){
 document.getElementById("go").onclick = start;
 
 document.getElementById("openfolder").onclick = () => api("/api/reveal", {});
+document.getElementById("update").onclick = () => api("/api/update", {}).then(poll);
 document.getElementById("quit").onclick = async () => {
   await api("/api/quit", {});
   document.body.innerHTML =
@@ -397,10 +403,16 @@ function render(state){
   if (s && s.state !== "ready" && s.state !== "checking") {
     box.classList.add("show");
     document.getElementById("setup-msg").textContent =
-      s.state === "error"      ? t("setupFail", s.error)
-      : s.state === "extracting" ? t("setupExtract", s.message)
+      s.state === "error"          ? t("setupFail", s.error)
+      : s.state === "update-failed" ? t("updateFailed", s.error)
+      : s.state === "updating"      ? t("updating")
+      : s.state === "updated"       ? t("updated")
+      : s.state === "extracting"    ? t("setupExtract", s.message)
       : t("setupOnce", s.message);
-    document.getElementById("setup-bar").style.width = (s.percent || 0) + "%";
+    const bar = document.getElementById("setup-bar").parentElement;
+    bar.classList.toggle("busy", s.state === "updating");
+    document.getElementById("setup-bar").style.width =
+      s.state === "updating" ? "35%" : (s.percent || 0) + "%";
   } else box.classList.remove("show");
 
   const list = document.getElementById("jobs");
@@ -445,7 +457,7 @@ async function poll(){
     const state = await api("/api/state");
     render(state);
     const busy = state.jobs.some(j => ["queued","probing","downloading","converting"].includes(j.status))
-              || (state.setup && !["ready","checking"].includes(state.setup.state));
+              || (state.setup && !["ready","checking","updated"].includes(state.setup.state));
     timer = setTimeout(poll, busy ? 500 : 2500);
   } catch (_) { timer = setTimeout(poll, 3000); }
 }

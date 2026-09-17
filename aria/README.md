@@ -45,8 +45,15 @@ to be re-encoded.
 | MP3 | V0 (~245 kbps), or V2 (~190 kbps) past 90 min | V0 (~245 kbps) | V5 (~130 kbps) |
 | MP4 | 1080p, or 720p past 45 min | up to 1080p | 720p |
 
-**Staying alive.** yt-dlp is updated in the background every few days (`yt-dlp -U`). A frozen
-copy of a downloader stops working within months; a self-updating one does not.
+**Staying alive.** Two mechanisms, because this is the part that rots.
+
+yt-dlp tracks its *nightly* channel and updates itself daily; YouTube breakages are fixed there
+first. The footer also has an Update button, so a fix can be pulled in without waiting.
+
+YouTube serves its player through several "clients" and rejects different ones over time - the
+symptom is `The following content is not available on this app`. Aria does not pin one client:
+it tries them in turn (`PLAYER_CLIENTS`), remembers the one that worked in `state.json`, and
+starts there next time. Errors that no client can fix, such as a private video, are not retried.
 
 **Shutting down.** The page sends a heartbeat while it is open. With no heartbeat for 150
 seconds and no active download, the server exits on its own, so closing the browser tab is
