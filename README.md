@@ -1,4 +1,4 @@
-# progetti-vari
+# Progetti-vari
 
 Standalone side projects. Each one lives in its own folder and builds independently.
 
@@ -7,8 +7,8 @@ Standalone side projects. Each one lives in its own folder and builds independen
 A small program for Windows that saves a YouTube video as an MP3 or an MP4.
 Double-click, paste a link, press Download. No Python, no installation, no terminal.
 
-**Download page for end users:** <https://andreimuresian.github.io/progetti-vari/>
-**Direct download:** [Aria.exe](https://github.com/andreimuresian/progetti-vari/releases/latest/download/Aria.exe)
+**Download page for end users:** <https://andreimuresian.github.io/Progetti-vari/>
+**Direct download:** [Aria.exe](https://github.com/andreimuresian/Progetti-vari/releases/latest/download/Aria.exe)
 
 Source in [`aria/`](aria/) · build pipeline in [`.github/workflows/build-aria.yml`](.github/workflows/build-aria.yml)
 
