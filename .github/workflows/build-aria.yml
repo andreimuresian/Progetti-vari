@@ -15,6 +15,7 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +88,7 @@ jobs:
           }
           finally {
             Start-Sleep -Seconds 2
-            if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+            taskkill /F /T /PID $app.Id 2>&1 | Out-Null
           }
 
       - name: Show the build log if anything failed
@@ -101,23 +102,32 @@ jobs:
 
       - name: Publish to the "latest" release
         if: github.ref == 'refs/heads/main'
+        timeout-minutes: 8
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
-          $built = (Get-Date).ToString("yyyy-MM-dd HH:mm 'UTC'")
-          $notes = @"
-          **Download ``Aria.exe`` below, then double-click it.** No installation, nothing to set up.
+          $ErrorActionPreference = "Continue"
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          $built = (Get-Date).ToString("yyyy-MM-dd HH:mm") + " UTC"
+          $lines = @(
+            '**Download `Aria.exe` just below, then double-click it.** Nothing to install.',
+            '',
+            'The first time, Windows shows a blue *Windows protected your PC* box, because the file',
+            'is not signed by a paid certificate. Click **More info**, then **Run anyway**.',
+            'It only asks once.',
+            '',
+            "Built from commit $sha on $built."
+          )
+          Set-Content -Path release-notes.md -Value $lines -Encoding utf8
 
-          The first time Windows will show a blue *"Windows protected your PC"* box, because the
-          file is not signed by a paid certificate. Click **More info**, then **Run anyway**.
-          It only asks once.
+          Write-Host "creating the release if it does not exist yet"
+          gh release create latest --repo $env:REPO --title "Aria - latest version" --notes-file release-notes.md
+          Write-Host "create exited with $LASTEXITCODE (non-zero simply means it already existed)"
 
-          Built from commit ``$($env:GITHUB_SHA.Substring(0,7))`` on $built.
-          "@
-          gh release view latest 2>$null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create latest "dist/Aria.exe" --title "Aria - latest version" --notes "$notes"
-          } else {
-            gh release upload latest "dist/Aria.exe" --clobber
-            gh release edit latest --notes "$notes"
-          }
+          Write-Host "uploading Aria.exe"
+          gh release upload latest dist/Aria.exe --repo $env:REPO --clobber
+          if ($LASTEXITCODE -ne 0) { throw "could not upload Aria.exe to the release" }
+
+          gh release edit latest --repo $env:REPO --notes-file release-notes.md
+          Write-Host "published"
