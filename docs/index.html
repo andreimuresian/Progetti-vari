@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aria — YouTube to MP3 / MP4</title>
+<meta name="description" content="A small, fast program for Windows that saves YouTube videos as MP3 or MP4 files.">
+<link rel="icon" href="aria.png">
+<style>
+  :root{
+    --bg:#0c0b0e; --bg-2:#141119; --card:rgba(255,255,255,.05); --line:rgba(255,255,255,.1);
+    --ink:#f4f1ea; --dim:#a8a196; --faint:#6f6a63;
+    --gold:#e3b04b; --gold-2:#c98a2c; --gold-ink:#20180a;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f7f4ef; --bg-2:#efeae1; --card:rgba(0,0,0,.035); --line:rgba(0,0,0,.1);
+           --ink:#1b1814; --dim:#584f45; --faint:#8d857a; --gold:#a9741a; --gold-2:#8d5f10; --gold-ink:#fffaf0; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background-image:radial-gradient(900px 520px at 50% -240px, rgba(227,176,75,.18), transparent 70%),
+                     linear-gradient(var(--bg), var(--bg-2));
+    background-attachment:fixed; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:660px; margin:0 auto; padding:56px 20px 80px}
+  .lang{position:absolute; top:18px; right:18px; display:flex; gap:2px;
+    background:var(--card); border:1px solid var(--line); border-radius:9px; padding:2px}
+  .lang button{border:0;background:none;color:var(--faint);font:600 11px/1 inherit;
+    padding:7px 9px;border-radius:7px;cursor:pointer}
+  .lang button[aria-pressed=true]{background:var(--line); color:var(--ink)}
+  header{text-align:center}
+  header img{width:88px;height:88px;border-radius:22px;box-shadow:0 14px 40px rgba(227,176,75,.28)}
+  h1{font:600 38px/1.1 Georgia,"Iowan Old Style",Cambria,serif; margin:18px 0 6px; letter-spacing:.3px}
+  .sub{color:var(--dim); font-size:17px; margin:0 auto; max-width:440px}
+  .cta{display:inline-flex; align-items:center; gap:10px; margin-top:30px; text-decoration:none;
+    background:linear-gradient(145deg,var(--gold),var(--gold-2)); color:var(--gold-ink);
+    font-size:17px; font-weight:700; padding:16px 30px; border-radius:13px;
+    box-shadow:0 10px 28px rgba(227,176,75,.3); transition:.15s}
+  .cta:hover{filter:brightness(1.07); transform:translateY(-1px)}
+  .cta svg{width:19px;height:19px;fill:currentColor}
+  .under{color:var(--faint); font-size:13px; margin-top:12px}
+  ol{list-style:none; counter-reset:s; padding:0; margin:46px 0 0}
+  ol li{counter-increment:s; position:relative; padding:16px 18px 16px 62px; margin-bottom:10px;
+    background:var(--card); border:1px solid var(--line); border-radius:13px}
+  ol li::before{content:counter(s); position:absolute; left:18px; top:16px; width:28px; height:28px;
+    border-radius:50%; background:linear-gradient(145deg,var(--gold),var(--gold-2)); color:var(--gold-ink);
+    display:grid; place-items:center; font-weight:700; font-size:14px}
+  ol li b{display:block; margin-bottom:2px}
+  ol li span{color:var(--dim); font-size:14.5px}
+  .note{margin-top:30px; padding:16px 18px; border-radius:13px; font-size:14.5px; color:var(--dim);
+    background:rgba(227,176,75,.09); border:1px solid rgba(227,176,75,.28)}
+  .note b{color:var(--ink)}
+  footer{margin-top:46px; text-align:center; color:var(--faint); font-size:13px}
+  footer a{color:var(--dim)}
+  .shot{margin-top:46px; width:100%; border-radius:14px; border:1px solid var(--line); display:block}
+</style>
+</head>
+<body>
+<div class="lang" role="group" aria-label="Language">
+  <button id="l-en" aria-pressed="false">EN</button>
+  <button id="l-it" aria-pressed="false">IT</button>
+</div>
+
+<div class="wrap">
+  <header>
+    <img src="aria.png" alt="">
+    <h1>Aria</h1>
+    <p class="sub" data-i="sub">Save any YouTube video as an MP3 or an MP4, on your own computer. Fast, free, nothing to install.</p>
+    <a class="cta" id="dl" href="https://github.com/andreimuresian/progetti-vari/releases/latest/download/Aria.exe">
+      <svg viewBox="0 0 24 24"><path d="M12 3v11.2l4.1-4.1 1.4 1.4L11 18l-6.5-6.5 1.4-1.4L10 14.2V3h2zM4 19h16v2H4z"/></svg>
+      <span data-i="cta">Download for Windows</span>
+    </a>
+    <div class="under" data-i="under">Windows 10 and 11 · about 12 MB · no installation</div>
+  </header>
+
+  <ol>
+    <li><b data-i="s1t">Download and double-click it</b>
+        <span data-i="s1b">The file lands in your Downloads folder. Double-click <code>Aria.exe</code> — it opens in your browser.</span></li>
+    <li><b data-i="s2t">Paste the link</b>
+        <span data-i="s2b">Copy the address of the video from YouTube and paste it in. Choose MP3 for audio, MP4 for video.</span></li>
+    <li><b data-i="s3t">Press Download</b>
+        <span data-i="s3b">The file is saved in your Downloads folder, inside a folder called Aria.</span></li>
+  </ol>
+
+  <div class="note">
+    <b data-i="wt">The first time only</b><br>
+    <span data-i="wb">Windows shows a blue box saying “Windows protected your PC”. That is normal for small free programs: click <b>More info</b>, then <b>Run anyway</b>. Aria then takes about a minute to set itself up. After that it starts instantly.</span>
+  </div>
+
+  <footer>
+    <span data-i="foot">Free and open source.</span>
+    <a href="https://github.com/andreimuresian/progetti-vari">GitHub</a>
+  </footer>
+</div>
+
+<script>
+const S = {
+  en:{ sub:"Save any YouTube video as an MP3 or an MP4, on your own computer. Fast, free, nothing to install.",
+       cta:"Download for Windows", under:"Windows 10 and 11 · about 12 MB · no installation",
+       s1t:"Download and double-click it",
+       s1b:"The file lands in your Downloads folder. Double-click Aria.exe — it opens in your browser.",
+       s2t:"Paste the link",
+       s2b:"Copy the address of the video from YouTube and paste it in. Choose MP3 for audio, MP4 for video.",
+       s3t:"Press Download",
+       s3b:"The file is saved in your Downloads folder, inside a folder called Aria.",
+       wt:"The first time only",
+       wb:"Windows shows a blue box saying “Windows protected your PC”. That is normal for small free programs: click More info, then Run anyway. Aria then takes about a minute to set itself up. After that it starts instantly.",
+       foot:"Free and open source." },
+  it:{ sub:"Salva qualsiasi video di YouTube come MP3 o MP4, sul tuo computer. Veloce, gratis, niente da installare.",
+       cta:"Scarica per Windows", under:"Windows 10 e 11 · circa 12 MB · nessuna installazione",
+       s1t:"Scaricalo e fai doppio clic",
+       s1b:"Il file finisce nella cartella Download. Fai doppio clic su Aria.exe — si apre nel browser.",
+       s2t:"Incolla il link",
+       s2b:"Copia l’indirizzo del video da YouTube e incollalo. Scegli MP3 per l’audio, MP4 per il video.",
+       s3t:"Premi Scarica",
+       s3b:"Il file viene salvato nella cartella Download, dentro una cartella chiamata Aria.",
+       wt:"Solo la prima volta",
+       wb:"Windows mostra un riquadro blu con scritto “Windows ha protetto il PC”. È normale per i piccoli programmi gratuiti: clicca Ulteriori informazioni, poi Esegui comunque. Aria impiega circa un minuto per prepararsi. Dopo si avvia subito.",
+       foot:"Gratuito e open source." }
+};
+let lang = localStorage.getItem("aria.site") ||
+           ((navigator.language || "en").toLowerCase().startsWith("it") ? "it" : "en");
+function apply(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i]").forEach(el => { el.textContent = S[lang][el.dataset.i]; });
+  document.getElementById("l-en").setAttribute("aria-pressed", lang === "en");
+  document.getElementById("l-it").setAttribute("aria-pressed", lang === "it");
+  localStorage.setItem("aria.site", lang);
+}
+document.getElementById("l-en").onclick = () => { lang = "en"; apply(); };
+document.getElementById("l-it").onclick = () => { lang = "it"; apply(); };
+apply();
+</script>
+</body>
+</html>

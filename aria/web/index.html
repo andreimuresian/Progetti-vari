@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aria</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  :root{
+    --bg:#0c0b0e; --bg-2:#131117; --card:rgba(255,255,255,.045); --card-2:rgba(255,255,255,.07);
+    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.18);
+    --ink:#f4f1ea; --ink-dim:#a49d92; --ink-faint:#6f6a63;
+    --gold:#e3b04b; --gold-2:#c98a2c; --gold-ink:#20180a;
+    --ok:#6fc28a; --bad:#e2795f;
+    --radius:14px; --shadow:0 18px 50px rgba(0,0,0,.45);
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f6f3ee; --bg-2:#efeae1; --card:rgba(0,0,0,.035); --card-2:rgba(0,0,0,.055);
+      --line:rgba(0,0,0,.10); --line-2:rgba(0,0,0,.20);
+      --ink:#1b1814; --ink-dim:#5d564d; --ink-faint:#8d857a;
+      --gold:#a9741a; --gold-2:#8d5f10; --gold-ink:#fffaf0;
+      --shadow:0 14px 40px rgba(0,0,0,.10);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 480px at 50% -220px, rgba(227,176,75,.16), transparent 70%),
+      linear-gradient(var(--bg), var(--bg-2));
+    background-attachment:fixed;
+  }
+  .wrap{max-width:660px; margin:0 auto; padding:34px 16px 60px}
+
+  header{display:flex; align-items:center; gap:12px; margin-bottom:26px}
+  .mark{width:38px;height:38px;border-radius:11px;flex:none;
+    background:linear-gradient(145deg,var(--gold),var(--gold-2));
+    display:grid;place-items:center;box-shadow:0 6px 18px rgba(227,176,75,.28)}
+  .mark svg{width:19px;height:19px;fill:var(--gold-ink)}
+  .name{font:600 21px/1 Georgia,"Iowan Old Style",Cambria,serif; letter-spacing:.3px}
+  .tag{color:var(--ink-faint); font-size:12px; margin-top:3px; letter-spacing:.06em; text-transform:uppercase}
+  header .spacer{flex:1}
+  .lang{display:flex; gap:2px; background:var(--card); border:1px solid var(--line); border-radius:9px; padding:2px}
+  .lang button{border:0;background:none;color:var(--ink-faint);font:600 11px/1 inherit;
+    padding:6px 8px;border-radius:7px;cursor:pointer;letter-spacing:.04em}
+  .lang button[aria-pressed="true"]{background:var(--card-2); color:var(--ink)}
+
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; box-shadow:var(--shadow); backdrop-filter:blur(8px)}
+
+  label.field{display:block; font-size:12px; color:var(--ink-dim); margin:0 0 7px;
+    letter-spacing:.05em; text-transform:uppercase}
+  .urlrow{display:flex; gap:8px}
+  input[type=url]{flex:1; min-width:0; background:rgba(0,0,0,.20); color:var(--ink);
+    border:1px solid var(--line-2); border-radius:10px; padding:12px 13px; font-size:15px; font-family:inherit}
+  @media (prefers-color-scheme: light){ input[type=url]{background:#fff} }
+  input[type=url]::placeholder{color:var(--ink-faint)}
+  input[type=url]:focus-visible,button:focus-visible,.tile:focus-within{outline:2px solid var(--gold); outline-offset:2px}
+
+  button{font-family:inherit}
+  .ghost{background:var(--card-2); color:var(--ink); border:1px solid var(--line-2);
+    border-radius:10px; padding:0 14px; cursor:pointer; font-size:14px; white-space:nowrap}
+  .ghost:hover{border-color:var(--gold)}
+
+  .preview{display:flex; gap:12px; align-items:center; margin-top:14px; padding:10px;
+    background:var(--card-2); border:1px solid var(--line); border-radius:11px}
+  .preview img{width:104px; height:59px; object-fit:cover; border-radius:7px; background:#000; flex:none}
+  .preview .t{font-weight:600; font-size:14px; line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .preview .m{color:var(--ink-faint); font-size:12px; margin-top:4px}
+  .preview.err{color:var(--bad); font-size:13px; display:block}
+
+  .row{display:flex; gap:10px; margin-top:20px}
+  .tile{flex:1; position:relative; background:var(--card-2); border:1px solid var(--line-2);
+    border-radius:12px; padding:14px 12px; cursor:pointer; text-align:center; transition:.15s}
+  .tile input{position:absolute; opacity:0; pointer-events:none}
+  .tile b{display:block; font-size:15px; letter-spacing:.02em}
+  .tile span{display:block; color:var(--ink-faint); font-size:11.5px; margin-top:3px}
+  .tile:hover{border-color:var(--line-2); background:var(--card)}
+  .tile.on{border-color:var(--gold); background:linear-gradient(180deg,rgba(227,176,75,.16),rgba(227,176,75,.05))}
+  .tile.on b{color:var(--gold)}
+
+  .pills{display:flex; gap:7px; margin-top:9px}
+  .pill{flex:1; background:var(--card-2); border:1px solid var(--line); color:var(--ink-dim);
+    border-radius:9px; padding:9px 6px; font-size:13px; cursor:pointer; transition:.15s}
+  .pill:hover{color:var(--ink)}
+  .pill.on{border-color:var(--gold); color:var(--ink); background:rgba(227,176,75,.12)}
+  .hint{color:var(--ink-faint); font-size:12px; margin-top:8px; min-height:16px}
+
+  .go{width:100%; margin-top:18px; border:0; border-radius:12px; padding:14px;
+    background:linear-gradient(145deg,var(--gold),var(--gold-2)); color:var(--gold-ink);
+    font-size:15.5px; font-weight:700; letter-spacing:.02em; cursor:pointer;
+    box-shadow:0 8px 22px rgba(227,176,75,.25); transition:.15s}
+  .go:hover:not(:disabled){filter:brightness(1.07)}
+  .go:disabled{opacity:.45; cursor:default; box-shadow:none}
+
+  .jobs{margin-top:22px; display:flex; flex-direction:column; gap:10px}
+  .job{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:13px 14px}
+  .job .top{display:flex; gap:10px; align-items:flex-start}
+  .job .t{flex:1; min-width:0; font-weight:600; font-size:14px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .badge{flex:none; font-size:10.5px; font-weight:700; letter-spacing:.07em; padding:3px 7px;
+    border-radius:5px; background:var(--card-2); color:var(--ink-dim); text-transform:uppercase}
+  .bar{height:6px; border-radius:99px; background:rgba(0,0,0,.28); margin-top:10px; overflow:hidden}
+  @media (prefers-color-scheme: light){ .bar{background:rgba(0,0,0,.10)} }
+  .bar i{display:block; height:100%; border-radius:99px;
+    background:linear-gradient(90deg,var(--gold-2),var(--gold)); transition:width .3s}
+  .bar.busy i{width:35% !important; animation:slide 1.3s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+  .meta{display:flex; gap:12px; align-items:center; margin-top:8px; font-size:12px; color:var(--ink-faint)}
+  .meta .spacer{flex:1}
+  .meta button{background:none; border:0; color:var(--ink-dim); cursor:pointer;
+    font-size:12px; padding:3px 6px; border-radius:6px}
+  .meta button:hover{color:var(--gold); background:var(--card-2)}
+  .job.done{border-color:rgba(111,194,138,.35)}
+  .job.error{border-color:rgba(226,121,95,.4)}
+  .job.error .msg{color:var(--bad); font-size:12.5px; margin-top:8px}
+
+  footer{margin-top:26px; display:flex; align-items:center; gap:10px;
+    font-size:12px; color:var(--ink-faint); flex-wrap:wrap}
+  footer code{font:11.5px/1.4 ui-monospace,Consolas,monospace; color:var(--ink-dim);
+    background:var(--card); padding:3px 6px; border-radius:5px;
+    overflow-wrap:anywhere}
+  footer .spacer{flex:1}
+  footer button{background:none;border:0;color:var(--ink-faint);cursor:pointer;font-size:12px;
+    padding:3px 6px;border-radius:6px; text-decoration:underline; text-underline-offset:3px}
+  footer button:hover{color:var(--gold)}
+
+  .setup{display:none; margin-bottom:16px; padding:14px 16px; border-radius:12px;
+    background:rgba(227,176,75,.09); border:1px solid rgba(227,176,75,.3); font-size:13.5px}
+  .setup.show{display:block}
+  .setup b{display:block; margin-bottom:4px}
+  .setup .bar{margin-top:10px}
+  .gone{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M8 5.5v9.2a3.2 3.2 0 1 0 1.9 2.9V9.4l8.3-2v5.3a3.2 3.2 0 1 0 1.9 2.9V3.2L8 5.5z"/></svg>
+    </div>
+    <div>
+      <div class="name">Aria</div>
+      <div class="tag" data-i="tagline">YouTube → MP3 · MP4</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="lang-en" aria-pressed="false">EN</button>
+      <button id="lang-it" aria-pressed="false">IT</button>
+    </div>
+  </header>
+
+  <div class="setup" id="setup" role="status" aria-live="polite">
+    <b data-i="setupTitle">Getting ready</b>
+    <div id="setup-msg"></div>
+    <div class="bar"><i id="setup-bar" style="width:0%"></i></div>
+  </div>
+
+  <div class="panel">
+    <label class="field" for="url" data-i="linkLabel">Video link</label>
+    <div class="urlrow">
+      <input id="url" type="url" inputmode="url" spellcheck="false"
+             placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
+      <button class="ghost" id="paste" data-i="paste">Paste</button>
+    </div>
+
+    <div id="preview" class="preview gone"></div>
+
+    <div class="row">
+      <label class="tile on" id="tile-mp3">
+        <input type="radio" name="kind" value="mp3" checked>
+        <b>MP3</b><span data-i="mp3Sub">Audio only</span>
+      </label>
+      <label class="tile" id="tile-mp4">
+        <input type="radio" name="kind" value="mp4">
+        <b>MP4</b><span data-i="mp4Sub">Video</span>
+      </label>
+    </div>
+
+    <div style="margin-top:18px">
+      <label class="field" data-i="qualityLabel">Quality</label>
+      <div class="pills" role="group" id="pills">
+        <button class="pill on" data-q="auto" data-i="qAuto">Automatic</button>
+        <button class="pill" data-q="best" data-i="qBest">Best</button>
+        <button class="pill" data-q="small" data-i="qSmall">Smaller file</button>
+      </div>
+      <div class="hint" id="hint"></div>
+    </div>
+
+    <button class="go" id="go" data-i="download">Download</button>
+  </div>
+
+  <div class="jobs" id="jobs"></div>
+
+  <footer>
+    <span data-i="savedTo">Saved to</span> <code id="outdir">…</code>
+    <button id="openfolder" data-i="openFolder">Open folder</button>
+    <span class="spacer"></span>
+    <span>Aria __ARIA_VERSION__</span>
+    <button id="quit" data-i="quit">Quit</button>
+  </footer>
+</div>
+
+<script>
+const TOKEN = "__ARIA_TOKEN__";
+
+/* ---------------------------------------------------------------- i18n */
+const STR = {
+  en: {
+    tagline:"YouTube → MP3 · MP4", linkLabel:"Video link", paste:"Paste",
+    mp3Sub:"Audio only", mp4Sub:"Video", qualityLabel:"Quality",
+    qAuto:"Automatic", qBest:"Best", qSmall:"Smaller file",
+    download:"Download", savedTo:"Saved to", openFolder:"Open folder", quit:"Quit",
+    setupTitle:"Getting ready", setupOnce:"One-time setup, about a minute. Downloading %s…",
+    setupExtract:"Unpacking %s…", setupFail:"Setup failed: %s",
+    hintAutoMp3:"Automatic picks the best audio quality for this length.",
+    hintAutoMp4:"Automatic picks %s for this video.",
+    hintAutoIdle:"Automatic adapts to the length of the video.",
+    hintBestMp3:"Around 245 kbps — indistinguishable from the original.",
+    hintSmallMp3:"Around 130 kbps — smaller files, still fine for speech.",
+    hintBestMp4:"Up to 1080p.", hintSmallMp4:"720p — a lot smaller, still sharp.",
+    checking:"Reading the link…", queued:"Waiting", probing:"Reading the link…",
+    downloading:"Downloading", converting:"Converting", done:"Ready",
+    error:"Failed", canceled:"Cancelled",
+    play:"Play", show:"Show in folder", cancelBtn:"Cancel", remove:"Remove",
+    badLink:"That doesn't look like a video link.",
+    left:"%s left", nothing:"Nothing yet"
+  },
+  it: {
+    tagline:"YouTube → MP3 · MP4", linkLabel:"Link del video", paste:"Incolla",
+    mp3Sub:"Solo audio", mp4Sub:"Video", qualityLabel:"Qualità",
+    qAuto:"Automatica", qBest:"Massima", qSmall:"File più piccolo",
+    download:"Scarica", savedTo:"Salvato in", openFolder:"Apri cartella", quit:"Esci",
+    setupTitle:"Preparazione", setupOnce:"Configurazione iniziale, circa un minuto. Scarico %s…",
+    setupExtract:"Estrazione di %s…", setupFail:"Preparazione fallita: %s",
+    hintAutoMp3:"L'automatica sceglie la qualità migliore per questa durata.",
+    hintAutoMp4:"L'automatica sceglie %s per questo video.",
+    hintAutoIdle:"L'automatica si adatta alla durata del video.",
+    hintBestMp3:"Circa 245 kbps — indistinguibile dall'originale.",
+    hintSmallMp3:"Circa 130 kbps — file più leggeri, ottimi per il parlato.",
+    hintBestMp4:"Fino a 1080p.", hintSmallMp4:"720p — molto più leggero, comunque nitido.",
+    checking:"Leggo il link…", queued:"In attesa", probing:"Leggo il link…",
+    downloading:"Scarico", converting:"Converto", done:"Pronto",
+    error:"Errore", canceled:"Annullato",
+    play:"Riproduci", show:"Mostra nella cartella", cancelBtn:"Annulla", remove:"Rimuovi",
+    badLink:"Questo non sembra il link di un video.",
+    left:"%s rimanenti", nothing:"Ancora niente"
+  }
+};
+let lang = (localStorage.getItem("aria.lang")) ||
+           ((navigator.language || "en").toLowerCase().startsWith("it") ? "it" : "en");
+const t = (k, ...a) => { let s = (STR[lang] && STR[lang][k]) || STR.en[k] || k;
+                         a.forEach(v => s = s.replace("%s", v)); return s; };
+
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i]").forEach(el => el.textContent = t(el.dataset.i));
+  document.getElementById("lang-en").setAttribute("aria-pressed", lang === "en");
+  document.getElementById("lang-it").setAttribute("aria-pressed", lang === "it");
+  localStorage.setItem("aria.lang", lang);
+  updateHint(); render(lastState);
+}
+document.getElementById("lang-en").onclick = () => { lang = "en"; applyLang(); };
+document.getElementById("lang-it").onclick = () => { lang = "it"; applyLang(); };
+
+/* ----------------------------------------------------------------- api */
+const api = (path, body) => fetch(path, {
+  method: body ? "POST" : "GET",
+  headers: { "X-Aria-Token": TOKEN, "Content-Type": "application/json" },
+  body: body ? JSON.stringify(body) : undefined
+}).then(r => r.json());
+
+/* ------------------------------------------------------------ helpers */
+const bytes = n => !n ? "" :
+  n >= 1e9 ? (n/1e9).toFixed(1)+" GB" : n >= 1e6 ? (n/1e6).toFixed(0)+" MB" : (n/1e3).toFixed(0)+" kB";
+const rate = n => !n ? "" : n >= 1e6 ? (n/1e6).toFixed(1)+" MB/s" : (n/1e3).toFixed(0)+" kB/s";
+function clock(s){
+  s = Math.max(0, Math.round(s || 0));
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`
+           : `${m}:${String(sec).padStart(2,"0")}`;
+}
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+/* ------------------------------------------------------------ choices */
+let kind = "mp3", quality = "auto", meta = null;
+
+function pickKind(k){
+  kind = k;
+  document.getElementById("tile-mp3").classList.toggle("on", k === "mp3");
+  document.getElementById("tile-mp4").classList.toggle("on", k === "mp4");
+  document.querySelector(`input[value="${k}"]`).checked = true;
+  updateHint();
+}
+document.getElementById("tile-mp3").onclick = () => pickKind("mp3");
+document.getElementById("tile-mp4").onclick = () => pickKind("mp4");
+
+document.getElementById("pills").addEventListener("click", e => {
+  const pill = e.target.closest(".pill");
+  if (!pill) return;
+  quality = pill.dataset.q;
+  document.querySelectorAll(".pill").forEach(p => p.classList.toggle("on", p === pill));
+  updateHint();
+});
+
+function updateHint(){
+  const h = document.getElementById("hint");
+  if (quality === "best")  return h.textContent = kind === "mp3" ? t("hintBestMp3")  : t("hintBestMp4");
+  if (quality === "small") return h.textContent = kind === "mp3" ? t("hintSmallMp3") : t("hintSmallMp4");
+  if (kind === "mp3")      return h.textContent = t("hintAutoMp3");
+  if (!meta || !meta.duration) return h.textContent = t("hintAutoIdle");
+  h.textContent = t("hintAutoMp4", meta.duration > 45*60 ? "720p" : "1080p");
+}
+
+/* ------------------------------------------------------------ preview */
+const urlBox = document.getElementById("url");
+const previewBox = document.getElementById("preview");
+let probeTimer = null, probeSeq = 0;
+
+function showPreview(){
+  const url = urlBox.value.trim();
+  meta = null; updateHint();
+  clearTimeout(probeTimer);
+  if (!/^https?:\/\/\S+$/i.test(url)) { previewBox.className = "preview gone"; return; }
+  previewBox.className = "preview"; previewBox.innerHTML = `<div class="m">${esc(t("checking"))}</div>`;
+  const seq = ++probeSeq;
+  probeTimer = setTimeout(async () => {
+    try {
+      const info = await api("/api/probe?url=" + encodeURIComponent(url));
+      if (seq !== probeSeq) return;
+      if (info.error) {
+        previewBox.className = "preview err";
+        previewBox.textContent = info.error;
+        return;
+      }
+      meta = info; updateHint();
+      previewBox.className = "preview";
+      previewBox.innerHTML =
+        (info.thumbnail ? `<img src="${esc(info.thumbnail)}" alt="">` : "") +
+        `<div><div class="t">${esc(info.title)}</div><div class="m">` +
+        esc([info.channel, info.duration ? clock(info.duration) : ""].filter(Boolean).join(" · ")) +
+        `</div></div>`;
+    } catch (_) { if (seq === probeSeq) previewBox.className = "preview gone"; }
+  }, 450);
+}
+urlBox.addEventListener("input", showPreview);
+urlBox.addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+
+document.getElementById("paste").onclick = async () => {
+  try {
+    urlBox.value = (await navigator.clipboard.readText()).trim();
+    showPreview(); urlBox.focus();
+  } catch (_) { urlBox.focus(); }
+};
+
+/* -------------------------------------------------------------- start */
+async function start(){
+  const url = urlBox.value.trim();
+  if (!/^https?:\/\/\S+$/i.test(url)) {
+    previewBox.className = "preview err"; previewBox.textContent = t("badLink"); return;
+  }
+  const go = document.getElementById("go");
+  go.disabled = true;
+  try {
+    await api("/api/start", { url, kind, quality, meta });
+    urlBox.value = ""; meta = null;
+    previewBox.className = "preview gone";
+    updateHint(); poll();
+  } finally { setTimeout(() => { go.disabled = false; }, 400); }
+}
+document.getElementById("go").onclick = start;
+
+document.getElementById("openfolder").onclick = () => api("/api/reveal", {});
+document.getElementById("quit").onclick = async () => {
+  await api("/api/quit", {});
+  document.body.innerHTML =
+    `<div class="wrap" style="text-align:center;padding-top:90px;color:var(--ink-dim)">` +
+    `<div class="name" style="font-size:24px;color:var(--ink)">Aria</div>` +
+    `<p style="margin-top:14px">${lang === "it" ? "Puoi chiudere questa scheda." : "You can close this tab."}</p></div>`;
+};
+
+/* ------------------------------------------------------------- render */
+let lastState = null;
+
+function render(state){
+  if (!state) return;
+  lastState = state;
+  document.getElementById("outdir").textContent = state.outputDir;
+
+  const s = state.setup, box = document.getElementById("setup");
+  if (s && s.state !== "ready" && s.state !== "checking") {
+    box.classList.add("show");
+    document.getElementById("setup-msg").textContent =
+      s.state === "error"      ? t("setupFail", s.error)
+      : s.state === "extracting" ? t("setupExtract", s.message)
+      : t("setupOnce", s.message);
+    document.getElementById("setup-bar").style.width = (s.percent || 0) + "%";
+  } else box.classList.remove("show");
+
+  const list = document.getElementById("jobs");
+  list.innerHTML = state.jobs.slice().reverse().map(job => {
+    const busy   = job.status === "downloading" || job.status === "converting" || job.status === "probing";
+    const indet  = job.status === "converting" || job.status === "probing";
+    const detail = job.status === "downloading"
+      ? [rate(job.speed), job.eta ? t("left", clock(job.eta)) : "", bytes(job.total)].filter(Boolean).join(" · ")
+      : job.status === "done" ? bytes(job.size) : "";
+    return `<div class="job ${job.status}">
+      <div class="top">
+        <div class="t">${esc(job.title)}</div>
+        <div class="badge">${esc(job.kind)} · ${esc(t(job.status))}</div>
+      </div>
+      ${busy || job.status === "queued"
+        ? `<div class="bar ${indet ? "busy" : ""}"><i style="width:${job.percent}%"></i></div>` : ""}
+      ${job.status === "error" ? `<div class="msg">${esc(job.error)}</div>` : ""}
+      <div class="meta">
+        <span>${esc(detail)}</span><span class="spacer"></span>
+        ${job.status === "done"
+          ? `<button data-act="play" data-id="${job.id}">▶ ${esc(t("play"))}</button>
+             <button data-act="reveal" data-id="${job.id}">${esc(t("show"))}</button>` : ""}
+        ${busy || job.status === "queued"
+          ? `<button data-act="cancel" data-id="${job.id}">${esc(t("cancelBtn"))}</button>`
+          : `<button data-act="remove" data-id="${job.id}">${esc(t("remove"))}</button>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+document.getElementById("jobs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  api("/api/" + b.dataset.act, { id: b.dataset.id }).then(poll);
+});
+
+/* --------------------------------------------------------------- poll */
+let timer = null;
+async function poll(){
+  clearTimeout(timer);
+  try {
+    const state = await api("/api/state");
+    render(state);
+    const busy = state.jobs.some(j => ["queued","probing","downloading","converting"].includes(j.status))
+              || (state.setup && !["ready","checking"].includes(state.setup.state));
+    timer = setTimeout(poll, busy ? 500 : 2500);
+  } catch (_) { timer = setTimeout(poll, 3000); }
+}
+
+applyLang();
+poll();
+urlBox.focus();
+</script>
+</body>
+</html>
